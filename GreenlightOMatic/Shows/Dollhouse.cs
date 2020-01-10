@@ -22,6 +22,7 @@ namespace GreenlightOMatic.Shows
 
     public async Task MakeShow(CancellationToken ct)
     {
+      Task.Delay(200); // Let other loggers catch up
       int season = 1,
           episodesPerSeason = 10;
 

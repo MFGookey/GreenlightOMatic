@@ -11,6 +11,7 @@ namespace GreenlightOMatic.Utility
     Simpsons,
     Firefly,
     Dollhouse,
+    KVille,
     Quit
   }
 }
