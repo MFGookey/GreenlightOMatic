@@ -1,80 +1,83 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using GreenlightOMatic.Shows;
 using GreenlightOMatic.Utility;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Console;
-using Microsoft.Extensions.Options;
 
 namespace GreenlightOMatic
 {
   public class GreenlightOMatic
   {
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Await.Warning", "CS4014:Await.Warning")]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Await.Warning", "CS1998:Await.Warning")]
+    private ILogger _logger;
+    private CancellationTokenSource _tokenSource;
+    private ShowOptions _choice;
+
     public async Task Run(ILoggerFactory loggerFactory)
     {
-      var logger = loggerFactory.CreateLogger<GreenlightOMatic>();
+      _logger = loggerFactory.CreateLogger<GreenlightOMatic>();
       var shows = new ShowOptions[]
         {
           ShowOptions.Simpsons,
           ShowOptions.Firefly,
           ShowOptions.Dollhouse,
+          ShowOptions.KVille,
           ShowOptions.Quit
         };
+      
+      Console.CancelKeyPress += (sender, eventArgs) =>
+      {
+        _logger.LogInformation($"Awaiting cancelled show {_choice.ToString()} to cancel.");
+        eventArgs.Cancel = true;
+        _tokenSource.Cancel();
+      };
 
       while (true)
       {
         DisplayMenu(shows);
-        var choice = GetSelection(shows);
-        Console.WriteLine($"You have selected {choice.ToString()}");
+        _choice = GetSelection(shows);
+        Console.WriteLine($"You have selected {_choice.ToString()}");
 
-        if (choice != ShowOptions.Quit)
+        if (_choice != ShowOptions.Quit)
         {
-          logger.LogInformation($"Beginning pre-production of {choice.ToString()}");
+          _logger.LogInformation($"Beginning pre-production of {_choice.ToString()}");
         }
 
-        Task showToRun = Task.Delay(0);
-
-        var tokenSource = new CancellationTokenSource();
-        var token = tokenSource.Token;
-        switch (choice)
+        _tokenSource = new CancellationTokenSource();
+        var token = _tokenSource.Token;
+        
+        IShow show = null;
+        
+        switch (_choice)
         {
           case ShowOptions.Simpsons:
-            Task.Factory.StartNew(async () =>
-            {
-              var show = new Simpsons(loggerFactory);
-              showToRun = show.MakeShow(token);
-            });
+            show = new Simpsons(loggerFactory);
             break;
           case ShowOptions.Firefly:
-            Task.Factory.StartNew(async () =>
-            {
-              var show = new Firefly(loggerFactory);
-              showToRun = show.MakeShow(token);
-            });
+            show = new Firefly(loggerFactory);
             break;
           case ShowOptions.Dollhouse:
-            Task.Factory.StartNew(async () =>
-            {
-              var show = new Dollhouse(loggerFactory);
-              showToRun = show.MakeShow(token);
-            });
+            show = new Dollhouse(loggerFactory);
+            break;
+          case ShowOptions.KVille:
+            show = new KVille(loggerFactory);
             break;
           case ShowOptions.Quit:
             return;
         }
-        logger.LogInformation("Pre-production complete.  Let's make some television, people!");
+        
+        _logger.LogInformation("Pre-production complete.  Let's make some television, people!");
+        
+        PromptCancel();
 
-        GetCancel();
-        tokenSource.Cancel();
-        logger.LogCritical($"Awaiting cancelled show {choice.ToString()} to cancel.");
-        await showToRun;
-        logger.LogCritical($"Show {choice.ToString()} has been cancelled.");
+        if (null != show)
+        {
+          await show.MakeShow(token).ContinueWith((t) =>
+          {
+            _logger.LogCritical($"Show {_choice.ToString()} has been cancelled.");
+          });
+        }
+
         await Task.Delay(1000); // Delay for a second to let the loggers finish up
       }
     }
@@ -85,6 +88,7 @@ namespace GreenlightOMatic
       {
         Console.Write("Enter option number:\t");
         var choice = Console.ReadLine();
+
         if (int.TryParse(choice, out int choiceOption))
         {
           if (choiceOption >= 0 && choiceOption < shows.Length)
@@ -105,19 +109,10 @@ namespace GreenlightOMatic
       }
     }
 
-    private void GetCancel()
+    private void PromptCancel()
     {
-      Console.Write("Enter \"c\" or \"C\" to cancel the show");
-      while (true)
-      {
-        Console.WriteLine();
-        var keyStroke = Console.ReadKey();
-        if (keyStroke.KeyChar.ToString().ToLowerInvariant().Equals("c"))
-        {
-          Console.WriteLine();
-          return;
-        }
-      }
+      Console.Write("Enter ctrl+\"c\" to cancel the show");
+      Console.WriteLine();
     }
   }
 }

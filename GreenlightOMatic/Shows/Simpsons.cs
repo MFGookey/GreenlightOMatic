@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 using GreenlightOMatic.Utility;
 using Microsoft.Extensions.Logging;
@@ -22,6 +18,7 @@ namespace GreenlightOMatic.Shows
 
     public async Task MakeShow(CancellationToken ct)
     {
+      await Task.Delay(200); // Let other loggers catch up
       int episode = 1,
           season = 1,
           episodesPerSeason = 10;
