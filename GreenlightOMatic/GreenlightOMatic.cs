@@ -47,35 +47,37 @@ namespace GreenlightOMatic
         var tokenSource = new CancellationTokenSource();
         var token = tokenSource.Token;
         int timeout = Timeout.Infinite;
+
+        Func<Task> taskToRun = () => Task.CompletedTask;
         switch (choice)
         {
           case ShowOptions.Simpsons:
-            await Task.Factory.StartNew(async () =>
+           taskToRun = async () =>
             {
               var show = new Simpsons(loggerFactory);
               showToRun = show.MakeShow(token);
-            });
+            };
             break;
           case ShowOptions.Firefly:
-            await Task.Factory.StartNew(async () =>
+            taskToRun = async () =>
             {
               var show = new Firefly(loggerFactory);
               showToRun = show.MakeShow(token);
-            });
+            };
             break;
           case ShowOptions.Dollhouse:
-            await Task.Factory.StartNew(async () =>
+            taskToRun = async () =>
             {
               var show = new Dollhouse(loggerFactory);
               showToRun = show.MakeShow(token);
-            });
+            };
             break;
           case ShowOptions.KVille:
-            await Task.Factory.StartNew(async () =>
+            taskToRun = async () =>
             {
               var show = new KVille(loggerFactory);
               showToRun = show.MakeShow(token);
-            });
+            };
 
             timeout = 100;
             break;
@@ -84,6 +86,8 @@ namespace GreenlightOMatic
         }
 
         _logger.LogInformation("Pre-production complete.  Let's make some television, people!");
+
+        await Task.Factory.StartNew(taskToRun);
 
         GetCancel(showToRun, timeout);
         if (showToRun.IsCanceled || showToRun.IsCompleted || showToRun.IsFaulted)
