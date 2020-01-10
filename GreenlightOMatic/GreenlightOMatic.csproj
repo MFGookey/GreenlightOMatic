@@ -110,7 +110,6 @@
     <Compile Include="Shows\Firefly.cs" />
     <Compile Include="Shows\Dollhouse.cs" />
     <Compile Include="Shows\Simpsons.cs" />
-    <Compile Include="Utility\Reader.cs" />
     <Compile Include="Utility\ShowOptions.cs" />
   </ItemGroup>
   <ItemGroup>
