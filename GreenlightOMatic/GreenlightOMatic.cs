@@ -9,11 +9,10 @@ namespace GreenlightOMatic
 {
   public class GreenlightOMatic
   {
-
     private ILogger _logger;
+    private CancellationTokenSource _tokenSource;
+    private ShowOptions _choice;
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Await.Warning", "CS4014:Await.Warning")]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Await.Warning", "CS1998:Await.Warning")]
     public async Task Run(ILoggerFactory loggerFactory)
     {
       _logger = loggerFactory.CreateLogger<GreenlightOMatic>();
@@ -25,80 +24,60 @@ namespace GreenlightOMatic
           ShowOptions.KVille,
           ShowOptions.Quit
         };
+      
+      Console.CancelKeyPress += (sender, eventArgs) =>
+      {
+        _logger.LogInformation($"Awaiting cancelled show {_choice.ToString()} to cancel.");
+        eventArgs.Cancel = true;
+        _tokenSource.Cancel();
+      };
 
       while (true)
       {
         DisplayMenu(shows);
-        var choice = GetSelection(shows);
-        Console.WriteLine($"You have selected {choice.ToString()}");
+        _choice = GetSelection(shows);
+        Console.WriteLine($"You have selected {_choice.ToString()}");
 
-        if (choice != ShowOptions.Quit)
+        if (_choice != ShowOptions.Quit)
         {
-          _logger.LogInformation($"Beginning pre-production of {choice.ToString()}");
+          _logger.LogInformation($"Beginning pre-production of {_choice.ToString()}");
         }
 
-        Task showToRun = Task.CompletedTask;
-
-        var tokenSource = new CancellationTokenSource();
-        var token = tokenSource.Token;
-        int timeout = Timeout.Infinite;
-
-        Func<Task> taskToRun = () => Task.CompletedTask;
-        switch (choice)
+        _tokenSource = new CancellationTokenSource();
+        var token = _tokenSource.Token;
+        
+        IShow show = null;
+        
+        switch (_choice)
         {
           case ShowOptions.Simpsons:
-           taskToRun = async () =>
-            {
-              var show = new Simpsons(loggerFactory);
-              showToRun = show.MakeShow(token);
-            };
+            show = new Simpsons(loggerFactory);
             break;
           case ShowOptions.Firefly:
-            taskToRun = async () =>
-            {
-              var show = new Firefly(loggerFactory);
-              showToRun = show.MakeShow(token);
-            };
+            show = new Firefly(loggerFactory);
             break;
           case ShowOptions.Dollhouse:
-            taskToRun = async () =>
-            {
-              var show = new Dollhouse(loggerFactory);
-              showToRun = show.MakeShow(token);
-            };
+            show = new Dollhouse(loggerFactory);
             break;
           case ShowOptions.KVille:
-            taskToRun = async () =>
-            {
-              var show = new KVille(loggerFactory);
-              showToRun = show.MakeShow(token);
-            };
-
-            timeout = 100;
+            show = new KVille(loggerFactory);
             break;
           case ShowOptions.Quit:
             return;
         }
-
+        
         _logger.LogInformation("Pre-production complete.  Let's make some television, people!");
+        
+        PromptCancel();
 
-        await Task.Factory.StartNew(taskToRun);
-
-        GetCancel(showToRun, timeout);
-        if (showToRun.IsCanceled || showToRun.IsCompleted || showToRun.IsFaulted)
+        if (null != show)
         {
-          _logger.LogCritical($"Cannot cancel {choice.ToString()} as something else cancelled it");
-        }
-        else
-        {
-          tokenSource.Cancel();
-          _logger.LogCritical($"Awaiting cancelled show {choice.ToString()} to cancel.");
-          if (showToRun.IsCanceled || showToRun.IsCompleted || showToRun.IsFaulted)
+          await show.MakeShow(token).ContinueWith((t) =>
           {
-            await showToRun;
-          }
-          _logger.LogCritical($"Show {choice.ToString()} has been cancelled.");
+            _logger.LogCritical($"Show {_choice.ToString()} has been cancelled.");
+          });
         }
+
         await Task.Delay(1000); // Delay for a second to let the loggers finish up
       }
     }
@@ -108,8 +87,7 @@ namespace GreenlightOMatic
       while (true)
       {
         Console.Write("Enter option number:\t");
-        var choice = Reader.ReadKey(Timeout.Infinite).KeyChar.ToString();
-        Console.WriteLine();
+        var choice = Console.ReadLine();
 
         if (int.TryParse(choice, out int choiceOption))
         {
@@ -131,31 +109,10 @@ namespace GreenlightOMatic
       }
     }
 
-    private void GetCancel(Task runningTask, int timeout)
+    private void PromptCancel()
     {
-      Console.Write("Enter \"c\" or \"C\" to cancel the show");
+      Console.Write("Enter ctrl+\"c\" to cancel the show");
       Console.WriteLine();
-      while (true)
-      {
-        try
-        {
-
-          var keyStroke = Reader.ReadKey(timeout);
-          if (keyStroke.KeyChar.ToString().ToLowerInvariant().Equals("c"))
-          {
-            return;
-          }
-          Console.WriteLine();
-        }
-        catch (TimeoutException)
-        {
-          _logger.LogDebug("Timeout Exception caught");
-          if (runningTask.IsCanceled || runningTask.IsCompleted || runningTask.IsFaulted)
-          {
-            return;
-          }
-        }
-      }
     }
   }
 }
