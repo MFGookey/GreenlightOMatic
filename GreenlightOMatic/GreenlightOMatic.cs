@@ -27,7 +27,7 @@ namespace GreenlightOMatic
       
       Console.CancelKeyPress += (sender, eventArgs) =>
       {
-        _logger.LogInformation($"Awaiting cancelled show {_choice.ToString()} to cancel.");
+        _logger.LogCritical($"Awaiting cancelled show {_choice.ToString()} to cancel.");
         eventArgs.Cancel = true;
         _tokenSource.Cancel();
       };
